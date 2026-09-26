@@ -1,0 +1,500 @@
+--------app-bridge-----------
+app/schemas/session.py
+"""
+Purpose: Defines Pydantic request/response schemas for session resources, including cursor pagination responses.
+Flow:
+      1. Declare standard SessionResponse DTO schema.
+      2. Declare CursorPaginatedSessionResponse schema supporting next cursor pointers and total counts.
+Inputs: SessionModel instances or dictionaries.
+Outputs: Serialized Pydantic DTOs.
+"""
+
+from datetime import datetime
+from typing import List, Optional
+from pydantic import BaseModel
+from app.models.session import SessionStatus
+
+
+class SessionResponse(BaseModel):
+    """
+    Purpose: DTO representation of a session record returned to public clients.
+    """
+
+    id: str
+    title: str
+    original_file_name: str
+    file_size_bytes: int
+    mime_type: str
+    status: SessionStatus
+    is_archived: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class CursorPaginatedSessionResponse(BaseModel):
+    """
+    Purpose: Response payload wrapper for cursor-paginated session lists.
+    Flow:
+          1. Hold array of SessionResponse items.
+          2. Return opaque base64 string or timestamp string as next_cursor.
+          3. Indicate if more items remain available beyond current page.
+    Inputs: items list, next_cursor string, has_more boolean.
+    Outputs: Cursor paginated response schema.
+    """
+
+    items: List[SessionResponse]
+    next_cursor: Optional[str] = None
+    has_more: bool
+    total: int
+--------app-bridge-----------
+app/repositories/session_repository.py
+"""
+Purpose: Enhanced session repository containing date-descending cursor pagination query logic filtering non-archived entries.
+Flow:
+      1. Accept optional base64 cursor decoding to ISO timestamp.
+      2. Filter entries where is_archived == False and created_at < cursor_timestamp.
+      3. Fetch limit + 1 records to accurately determine has_more boolean.
+Inputs: AsyncSession database handle.
+Outputs: Tuple of (records, next_cursor, has_more, total_count).
+"""
+
+import base64
+from datetime import datetime
+from typing import Sequence, Tuple, Optional
+from sqlalchemy import select, func, and_
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.models.session import SessionModel
+
+
+class SessionRepository:
+    """
+    Purpose: Encapsulates data access and cursor-paginated queries for session entities.
+    """
+
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def create(self, session: SessionModel) -> SessionModel:
+        self.db.add(session)
+        await self.db.flush()
+        await self.db.refresh(session)
+        return session
+
+    async def get_by_id(self, session_id: str) -> Optional[SessionModel]:
+        result = await self.db.execute(
+            select(SessionModel).where(SessionModel.id == session_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_all_paginated(
+        self,
+        cursor: Optional[str] = None,
+        limit: int = 20,
+    ) -> Tuple[Sequence[SessionModel], Optional[str], bool, int]:
+        """
+        Purpose: Fetches non-archived sessions ordered by creation date descending with cursor pagination.
+        Flow:
+              1. Count total non-archived records.
+              2. Decode cursor string to datetime if provided.
+              3. Query limit + 1 items with created_at < cursor filter.
+              4. Derive next_cursor and has_more flag.
+        Inputs: cursor (Optional[str]), limit (int).
+        Outputs: Tuple containing (items, next_cursor, has_more, total_count).
+        """
+        # Count total non-archived sessions
+        total_stmt = select(func.count(SessionModel.id)).where(
+            SessionModel.is_archived == False
+        )
+        total_res = await self.db.execute(total_stmt)
+        total_count = total_res.scalar_one() or 0
+
+        # Base query for non-archived items ordered descending by created_at
+        stmt = (
+            select(SessionModel)
+            .where(SessionModel.is_archived == False)
+            .order_by(SessionModel.created_at.desc(), SessionModel.id.desc())
+        )
+
+        if cursor:
+            try:
+                decoded_str = base64.b64decode(cursor.encode()).decode()
+                cursor_dt = datetime.fromisoformat(decoded_str)
+                stmt = stmt.where(SessionModel.created_at < cursor_dt)
+            except Exception:
+                pass  # Ignore invalid cursor formatting gracefully
+
+        # Query limit + 1 to determine if more items exist
+        stmt = stmt.limit(limit + 1)
+        result = await self.db.execute(stmt)
+        records = result.scalars().all()
+
+        has_more = len(records) > limit
+        items = records[:limit]
+
+        next_cursor = None
+        if has_more and items:
+            last_item_dt = items[-1].created_at.isoformat()
+            next_cursor = base64.b64encode(last_item_dt.encode()).decode()
+
+        return items, next_cursor, has_more, total_count
+--------app-bridge-----------
+tests/test_task_05_cursor_pagination.py
+"""
+Purpose: Unit tests for TASK-05 JIT cursor pagination query helpers against SQLite database.
+Flow:
+      1. Seed mock session entities across varying timestamps.
+      2. Verify first page query returns expected limit and correct next_cursor.
+      3. Verify subsequent page query using returned cursor filters older entries.
+      4. Ensure archived session records are excluded.
+Inputs: db_session AsyncSession fixture.
+Outputs: Pytest assertions.
+"""
+
+import base64
+import uuid
+import pytest
+from datetime import datetime, timedelta
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.session import SessionModel, SessionStatus
+from app.repositories.session_repository import SessionRepository
+
+
+@pytest.mark.asyncio
+async def test_cursor_pagination_filtering_and_ordering(db_session: AsyncSession):
+    """
+    Purpose: Verify date-descending cursor pagination logic and non-archived filtering.
+    Flow:
+          1. Create 5 session entities with different creation dates (1 is archived).
+          2. Fetch page 1 with limit=2.
+          3. Validate order (newest first), has_more=True, and valid next_cursor.
+          4. Fetch page 2 with returned cursor.
+          5. Confirm archived record is excluded from total and items.
+    """
+    repo = SessionRepository(db_session)
+    base_time = datetime.utcnow()
+
+    # Create 4 active sessions and 1 archived session
+    sessions = []
+    for i in range(4):
+        s = SessionModel(
+            id=str(uuid.uuid4()),
+            title=f"Session {i}",
+            file_path=f"/tmp/audio_{i}.m4a",
+            original_file_name=f"recording_{i}.m4a",
+            file_size_bytes=1000 * (i + 1),
+            mime_type="audio/m4a",
+            status=SessionStatus.COMPLETED,
+            is_archived=False,
+            created_at=base_time - timedelta(hours=i),
+        )
+        sessions.append(s)
+        db_session.add(s)
+
+    archived_s = SessionModel(
+        id=str(uuid.uuid4()),
+        title="Archived Session",
+        file_path="/tmp/audio_archived.m4a",
+        original_file_name="archived.m4a",
+        file_size_bytes=5000,
+        mime_type="audio/m4a",
+        status=SessionStatus.COMPLETED,
+        is_archived=True,
+        created_at=base_time + timedelta(hours=1),
+    )
+    db_session.add(archived_s)
+    await db_session.commit()
+
+    # --- Page 1 Execution ---
+    items_p1, next_cursor_p1, has_more_p1, total = await repo.get_all_paginated(
+        cursor=None, limit=2
+    )
+
+    assert total == 4  # Excludes archived record
+    assert len(items_p1) == 2
+    assert has_more_p1 is True
+    assert next_cursor_p1 is not None
+    assert items_p1[0].title == "Session 0"  # Newest
+    assert items_p1[1].title == "Session 1"
+
+    # --- Page 2 Execution ---
+    items_p2, next_cursor_p2, has_more_p2, _ = await repo.get_all_paginated(
+        cursor=next_cursor_p1, limit=2
+    )
+
+    assert len(items_p2) == 2
+    assert items_p2[0].title == "Session 2"
+    assert items_p2[1].title == "Session 3"  # Oldest
+    assert has_more_p2 is False
+    assert next_cursor_p2 is None
+
+--------app-bridge-----------
+docs/spec/initial/phase_3_cursor_pagination.md
+# Phase 3: Session Listing & Cursor Pagination Specification
+
+## 1. Overview
+Phase 3 introduces cursor-based pagination for listing meeting session records in descending chronological order (`created_at DESC`). Cursor pagination ensures consistent O(1) performance across large data sets and prevents missing or duplicate items when sessions are added concurrently.
+
+---
+
+## 2. Technical Requirements
+
+### Query Behavior & Filters
+* **Sort Order:** `created_at DESC, id DESC`
+* **Filter:** Exclude archived entities (`is_archived == False`).
+* **Pagination Method:** Opaque base64-encoded ISO timestamp string derived from the last record on the current page.
+* **Limit:** Default 20 items per request, configurable via query parameter.
+
+### Schema Specifications
+
+#### `CursorPaginatedSessionResponse`
+* `items` (`List[SessionResponse]`): Array of session data transfer objects.
+* `next_cursor` (`Optional[str]`): Opaque cursor pointer for requesting the next page. `null` if no additional pages exist.
+* `has_more` (`bool`): Flag indicating if further records are available beyond the returned items.
+* `total` (`int`): Count of all non-archived session records matching the query scope.
+
+---
+
+## 3. Data Flow Architecture
+
+1. API receives request -> `GET /api/v1/sessions?cursor={cursor}&limit={limit}`.
+2. Endpoint passes arguments to `SessionRepository.get_all_paginated(cursor, limit)`.
+3. Repository decodes base64 `cursor` to ISO `datetime` filter `created_at < cursor_dt`.
+4. Executes DB count query for total non-archived records.
+5. Executes item fetch with `limit + 1` window size.
+6. Constructs `next_cursor` from `items[-1].created_at` if extra record detected.
+7. Encapsulates payload inside `CursorPaginatedSessionResponse` DTO and returns HTTP 200.
+--------app-bridge-----------
+app/schemas/session.py
+"""
+Purpose: Defines Pydantic request/response schemas for session resources, including cursor pagination responses.
+Flow:
+      1. Declare standard SessionResponse DTO schema.
+      2. Declare CursorPaginatedSessionResponse schema supporting next cursor pointers and total counts.
+Inputs: SessionModel instances or dictionaries.
+Outputs: Serialized Pydantic DTOs.
+"""
+
+from datetime import datetime
+from typing import List, Optional
+from pydantic import BaseModel
+from app.models.session import SessionStatus
+
+
+class SessionResponse(BaseModel):
+    """
+    Purpose: DTO representation of a session record returned to public clients.
+    """
+
+    id: str
+    title: str
+    original_file_name: str
+    file_size_bytes: int
+    mime_type: str
+    status: SessionStatus
+    is_archived: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class CursorPaginatedSessionResponse(BaseModel):
+    """
+    Purpose: Response payload wrapper for cursor-paginated session lists.
+    Flow:
+          1. Hold array of SessionResponse items.
+          2. Return opaque base64 string or timestamp string as next_cursor.
+          3. Indicate if more items remain available beyond current page.
+    Inputs: items list, next_cursor string, has_more boolean.
+    Outputs: Cursor paginated response schema.
+    """
+
+    items: List[SessionResponse]
+    next_cursor: Optional[str] = None
+    has_more: bool
+    total: int
+--------app-bridge-----------
+app/repositories/session_repository.py
+"""
+Purpose: Enhanced session repository containing date-descending cursor pagination query logic filtering non-archived entries.
+Flow:
+      1. Accept optional base64 cursor decoding to ISO timestamp.
+      2. Filter entries where is_archived == False and created_at < cursor_timestamp.
+      3. Fetch limit + 1 records to accurately determine has_more boolean.
+Inputs: AsyncSession database handle.
+Outputs: Tuple of (records, next_cursor, has_more, total_count).
+"""
+
+import base64
+from datetime import datetime
+from typing import Sequence, Tuple, Optional
+from sqlalchemy import select, func
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.models.session import SessionModel
+
+
+class SessionRepository:
+    """
+    Purpose: Encapsulates data access and cursor-paginated queries for session entities.
+    """
+
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def create(self, session: SessionModel) -> SessionModel:
+        self.db.add(session)
+        await self.db.flush()
+        await self.db.refresh(session)
+        return session
+
+    async def get_by_id(self, session_id: str) -> Optional[SessionModel]:
+        result = await self.db.execute(
+            select(SessionModel).where(SessionModel.id == session_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_all_paginated(
+        self,
+        cursor: Optional[str] = None,
+        limit: int = 20,
+    ) -> Tuple[Sequence[SessionModel], Optional[str], bool, int]:
+        """
+        Purpose: Fetches non-archived sessions ordered by creation date descending with cursor pagination.
+        Flow:
+              1. Count total non-archived records.
+              2. Decode cursor string to datetime if provided.
+              3. Query limit + 1 items with created_at < cursor filter.
+              4. Derive next_cursor and has_more flag.
+        Inputs: cursor (Optional[str]), limit (int).
+        Outputs: Tuple containing (items, next_cursor, has_more, total_count).
+        """
+        # Count total non-archived sessions
+        total_stmt = select(func.count(SessionModel.id)).where(
+            SessionModel.is_archived == False
+        )
+        total_res = await self.db.execute(total_stmt)
+        total_count = total_res.scalar_one() or 0
+
+        # Base query for non-archived items ordered descending by created_at
+        stmt = (
+            select(SessionModel)
+            .where(SessionModel.is_archived == False)
+            .order_by(SessionModel.created_at.desc(), SessionModel.id.desc())
+        )
+
+        if cursor:
+            try:
+                decoded_str = base64.b64decode(cursor.encode()).decode()
+                cursor_dt = datetime.fromisoformat(decoded_str)
+                stmt = stmt.where(SessionModel.created_at < cursor_dt)
+            except Exception:
+                pass  # Ignore invalid cursor formatting gracefully
+
+        # Query limit + 1 to determine if more items exist
+        stmt = stmt.limit(limit + 1)
+        result = await self.db.execute(stmt)
+        records = result.scalars().all()
+
+        has_more = len(records) > limit
+        items = records[:limit]
+
+        next_cursor = None
+        if has_more and items:
+            last_item_dt = items[-1].created_at.isoformat()
+            next_cursor = base64.b64encode(last_item_dt.encode()).decode()
+
+        return items, next_cursor, has_more, total_count
+--------app-bridge-----------
+tests/test_task_05_cursor_pagination.py
+"""
+Purpose: Unit tests for TASK-05 JIT cursor pagination query helpers against SQLite database.
+Flow:
+      1. Seed mock session entities across varying timestamps.
+      2. Verify first page query returns expected limit and correct next_cursor.
+      3. Verify subsequent page query using returned cursor filters older entries.
+      4. Ensure archived session records are excluded.
+Inputs: db_session AsyncSession fixture.
+Outputs: Pytest assertions.
+"""
+
+import uuid
+import pytest
+from datetime import datetime, timedelta
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.session import SessionModel, SessionStatus
+from app.repositories.session_repository import SessionRepository
+
+
+@pytest.mark.asyncio
+async def test_cursor_pagination_filtering_and_ordering(db_session: AsyncSession):
+    """
+    Purpose: Verify date-descending cursor pagination logic and non-archived filtering.
+    Flow:
+          1. Create 5 session entities with different creation dates (1 is archived).
+          2. Fetch page 1 with limit=2.
+          3. Validate order (newest first), has_more=True, and valid next_cursor.
+          4. Fetch page 2 with returned cursor.
+          5. Confirm archived record is excluded from total and items.
+    """
+    repo = SessionRepository(db_session)
+    base_time = datetime.utcnow()
+
+    # Create 4 active sessions and 1 archived session
+    sessions = []
+    for i in range(4):
+        s = SessionModel(
+            id=str(uuid.uuid4()),
+            title=f"Session {i}",
+            file_path=f"/tmp/audio_{i}.m4a",
+            original_file_name=f"recording_{i}.m4a",
+            file_size_bytes=1000 * (i + 1),
+            mime_type="audio/m4a",
+            status=SessionStatus.COMPLETED,
+            is_archived=False,
+            created_at=base_time - timedelta(hours=i),
+        )
+        sessions.append(s)
+        db_session.add(s)
+
+    archived_s = SessionModel(
+        id=str(uuid.uuid4()),
+        title="Archived Session",
+        file_path="/tmp/audio_archived.m4a",
+        original_file_name="archived.m4a",
+        file_size_bytes=5000,
+        mime_type="audio/m4a",
+        status=SessionStatus.COMPLETED,
+        is_archived=True,
+        created_at=base_time + timedelta(hours=1),
+    )
+    db_session.add(archived_s)
+    await db_session.commit()
+
+    # --- Page 1 Execution ---
+    items_p1, next_cursor_p1, has_more_p1, total = await repo.get_all_paginated(
+        cursor=None, limit=2
+    )
+
+    assert total == 4  # Excludes archived record
+    assert len(items_p1) == 2
+    assert has_more_p1 is True
+    assert next_cursor_p1 is not None
+    assert items_p1[0].title == "Session 0"  # Newest
+    assert items_p1[1].title == "Session 1"
+
+    # --- Page 2 Execution ---
+    items_p2, next_cursor_p2, has_more_p2, _ = await repo.get_all_paginated(
+        cursor=next_cursor_p1, limit=2
+    )
+
+    assert len(items_p2) == 2
+    assert items_p2[0].title == "Session 2"
+    assert items_p2[1].title == "Session 3"  # Oldest
+    assert has_more_p2 is False
+    assert next_cursor_p2 is None
