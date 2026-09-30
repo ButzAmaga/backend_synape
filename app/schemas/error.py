@@ -19,10 +19,9 @@ class ErrorDetail(BaseModel):
     Outputs: Serialized error detail object.
     """
 
-    code: str = Field(..., example="INTERNAL_SERVER_ERROR")
-    message: str = Field(..., example="An unexpected server error occurred.")
-    requestId: str = Field(..., example="req_abc123xyz")
-
+    code: str = Field(..., json_schema_extra={"example": "INTERNAL_SERVER_ERROR"})
+    message: str = Field(..., json_schema_extra={"example": "An unexpected server error occurred."})
+    requestId: str = Field(..., json_schema_extra={"example": "req_abc123xyz"})
 
 class ErrorResponse(BaseModel):
     """

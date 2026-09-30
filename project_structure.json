@@ -1,0 +1,438 @@
+{
+  "type": "directory",
+  "name": "backend",
+  "children": [
+    {
+      "type": "directory",
+      "name": ".data",
+      "children": [
+        {
+          "type": "directory",
+          "name": "audio",
+          "children": [
+            {
+              "type": "file",
+              "name": "46698850-cb6e-4050-b7df-4ee8d8652d7f.mp3"
+            },
+            {
+              "type": "file",
+              "name": "57259640-de39-4f32-aa6d-0dfbbc7b898d.mp3"
+            },
+            {
+              "type": "file",
+              "name": "7f166c0a-5f6c-4d9e-bdae-40d6b47aa147.mp3"
+            },
+            {
+              "type": "file",
+              "name": "8aeb0bb4-c754-4a5d-ab35-949e2cb1ef8f.mp3"
+            },
+            {
+              "type": "file",
+              "name": "b6f1885a-a5d0-43e2-be3a-e4091a9d3dbb.mp3"
+            },
+            {
+              "type": "file",
+              "name": "c1aad925-9e43-47c9-9ab3-43f37b3ebe82.mp3"
+            }
+          ]
+        },
+        {
+          "type": "file",
+          "name": "app_data.db"
+        },
+        {
+          "type": "file",
+          "name": "app_data.db-shm"
+        },
+        {
+          "type": "file",
+          "name": "app_data.db-wal"
+        }
+      ]
+    },
+    {
+      "type": "directory",
+      "name": ".pytest_cache",
+      "children": [
+        {
+          "type": "directory",
+          "name": "v",
+          "children": [
+            {
+              "type": "directory",
+              "name": "cache",
+              "children": [
+                {
+                  "type": "file",
+                  "name": "lastfailed"
+                },
+                {
+                  "type": "file",
+                  "name": "nodeids"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "file",
+          "name": ".gitignore"
+        },
+        {
+          "type": "file",
+          "name": "CACHEDIR.TAG"
+        },
+        {
+          "type": "file",
+          "name": "README.md"
+        }
+      ]
+    },
+    {
+      "type": "directory",
+      "name": "app",
+      "children": [
+        {
+          "type": "directory",
+          "name": "api",
+          "children": [
+            {
+              "type": "directory",
+              "name": "middleware",
+              "children": [
+                {
+                  "type": "file",
+                  "name": "correlation.py"
+                },
+                {
+                  "type": "file",
+                  "name": "error_handler.py"
+                }
+              ]
+            },
+            {
+              "type": "directory",
+              "name": "v1",
+              "children": [
+                {
+                  "type": "directory",
+                  "name": "endpoints",
+                  "children": [
+                    {
+                      "type": "file",
+                      "name": "health.py"
+                    },
+                    {
+                      "type": "file",
+                      "name": "sessions.py"
+                    }
+                  ]
+                },
+                {
+                  "type": "file",
+                  "name": "router.py"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "directory",
+          "name": "core",
+          "children": [
+            {
+              "type": "file",
+              "name": "config.py"
+            },
+            {
+              "type": "file",
+              "name": "database.py"
+            },
+            {
+              "type": "file",
+              "name": "pipeline.py"
+            }
+          ]
+        },
+        {
+          "type": "directory",
+          "name": "models",
+          "children": [
+            {
+              "type": "file",
+              "name": "category.py"
+            },
+            {
+              "type": "file",
+              "name": "session.py"
+            }
+          ]
+        },
+        {
+          "type": "directory",
+          "name": "repositories",
+          "children": [
+            {
+              "type": "file",
+              "name": "category_repository.py"
+            },
+            {
+              "type": "file",
+              "name": "session_repository.py"
+            }
+          ]
+        },
+        {
+          "type": "directory",
+          "name": "schemas",
+          "children": [
+            {
+              "type": "file",
+              "name": "error.py"
+            },
+            {
+              "type": "file",
+              "name": "health.py"
+            },
+            {
+              "type": "file",
+              "name": "pipeline.py"
+            },
+            {
+              "type": "file",
+              "name": "session.py"
+            }
+          ]
+        },
+        {
+          "type": "directory",
+          "name": "services",
+          "children": [
+            {
+              "type": "file",
+              "name": "local_storage_service.py"
+            },
+            {
+              "type": "file",
+              "name": "pipeline_service.py"
+            },
+            {
+              "type": "file",
+              "name": "session_service.py"
+            }
+          ]
+        },
+        {
+          "type": "file",
+          "name": "__init__.py"
+        },
+        {
+          "type": "file",
+          "name": "main.py"
+        }
+      ]
+    },
+    {
+      "type": "directory",
+      "name": "docs",
+      "children": [
+        {
+          "type": "directory",
+          "name": "api",
+          "children": [
+            {
+              "type": "directory",
+              "name": "v1",
+              "children": [
+                {
+                  "type": "file",
+                  "name": "sessions_mutations.md"
+                },
+                {
+                  "type": "file",
+                  "name": "sessions_pagination.md"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "directory",
+          "name": "app-bridge",
+          "children": [
+            {
+              "type": "file",
+              "name": "payload.txt"
+            },
+            {
+              "type": "file",
+              "name": "task_4_payload.txt"
+            },
+            {
+              "type": "file",
+              "name": "tasks_5_payload.txt"
+            }
+          ]
+        },
+        {
+          "type": "directory",
+          "name": "prompt",
+          "children": [
+            {
+              "type": "file",
+              "name": "intial_spec.md"
+            }
+          ]
+        },
+        {
+          "type": "directory",
+          "name": "spec",
+          "children": [
+            {
+              "type": "directory",
+              "name": "initial",
+              "children": [
+                {
+                  "type": "file",
+                  "name": "task_3.md"
+                },
+                {
+                  "type": "file",
+                  "name": "task_5.md"
+                },
+                {
+                  "type": "file",
+                  "name": "tasks_1.md"
+                },
+                {
+                  "type": "file",
+                  "name": "tasks_2.md"
+                },
+                {
+                  "type": "file",
+                  "name": "tasks_4.md"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "file",
+          "name": "always-ask.md"
+        },
+        {
+          "type": "file",
+          "name": "api_overview.md"
+        }
+      ]
+    },
+    {
+      "type": "directory",
+      "name": "rules",
+      "children": [
+        {
+          "type": "file",
+          "name": "communication-style.md"
+        },
+        {
+          "type": "file",
+          "name": "Production API Steering Rules.md"
+        },
+        {
+          "type": "file",
+          "name": "standard_docstring backend.md"
+        },
+        {
+          "type": "file",
+          "name": "tasks-breakdown.md"
+        }
+      ]
+    },
+    {
+      "type": "directory",
+      "name": "spec",
+      "children": [
+        {
+          "type": "directory",
+          "name": "initial",
+          "children": [
+            {
+              "type": "file",
+              "name": "design.md"
+            },
+            {
+              "type": "file",
+              "name": "requirements.md"
+            },
+            {
+              "type": "file",
+              "name": "tasks.md"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "directory",
+      "name": "tests",
+      "children": [
+        {
+          "type": "directory",
+          "name": "api",
+          "children": [
+            {
+              "type": "directory",
+              "name": "v1",
+              "children": [
+                {
+                  "type": "file",
+                  "name": "test_pipeline.py"
+                },
+                {
+                  "type": "file",
+                  "name": "test_sessions_mutations.py"
+                },
+                {
+                  "type": "file",
+                  "name": "test_sessions_pagination.py"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "file",
+          "name": "conftest.py"
+        },
+        {
+          "type": "file",
+          "name": "test_task_05_cursor_pagination.py"
+        },
+        {
+          "type": "file",
+          "name": "test_task_4.py"
+        },
+        {
+          "type": "file",
+          "name": "test_tasks_1_to_3.py"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": ".gitignore"
+    },
+    {
+      "type": "file",
+      "name": "activate.bin"
+    },
+    {
+      "type": "file",
+      "name": "commands.json"
+    },
+    {
+      "type": "file",
+      "name": "pytest.ini"
+    }
+  ]
+}

@@ -1,23 +1,24 @@
 """
-Purpose: Business logic layer for creating and initializing session records.
+Purpose: Business logic layer for creating, mutating, archiving, and purging session records.
 Flow:
-      1. Verify host storage capacity against inbound file size.
-      2. Stream upload binary chunks safely onto persistent disk.
-      3. Save initial database record using SessionRepository.
-Inputs: UploadFile payload, title string, and active AsyncSession.
-Outputs: Created SessionModel instance or raises HTTP error exceptions.
+      1. Enforce archive guard policy (HTTP 400 when attempting to mutate archived sessions).
+      2. Manage session creation, title update, category assignment, archiving, and hard deletion with physical disk file removal.
+Inputs: AsyncSession, UploadFile, DTO payloads, session IDs.
+Outputs: SessionModel instances, booleans, or raises HTTP exceptions.
 """
 
 import os
 import uuid
 import pathlib
 import aiofiles
+from typing import Optional
 from fastapi import UploadFile, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.session import SessionModel, SessionStatus
 from app.repositories.session_repository import SessionRepository
+from app.repositories.category_repository import CategoryRepository
 from app.services.local_storage_service import LocalStorageService
 
 ALLOWED_MIME_TYPES = {
@@ -32,17 +33,34 @@ ALLOWED_MIME_TYPES = {
 
 class SessionService:
     """
-    Purpose: Service handling session creation lifecycle and audio file storage.
-    Flow:
-          1. Validate audio MIME type.
-          2. Check available storage space.
-          3. Save audio file locally and record database entry.
-    Inputs: Database AsyncSession.
-    Outputs: SessionService instance.
+    Purpose: Service handling session creation lifecycle, mutations, archiving, and physical file deletion.
     """
 
     def __init__(self, db: AsyncSession):
         self.repository = SessionRepository(db)
+        self.category_repository = CategoryRepository(db)
+
+    async def _get_active_session_or_raise(self, session_id: str) -> SessionModel:
+        """
+        Purpose: Internal helper ensuring session exists and enforcing the archived mutation guard shield.
+        Flow:
+              1. Fetch session by ID. Raise HTTP 404 if missing.
+              2. Check if is_archived is True. Raise HTTP 400 Bad Request if archived.
+        Inputs: session_id (str).
+        Outputs: Active, non-archived SessionModel instance or raises HTTPException.
+        """
+        session = await self.repository.get_by_id(session_id)
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Session with ID '{session_id}' was not found.",
+            )
+        if session.is_archived:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot modify an archived session. Unarchive the session before making changes.",
+            )
+        return session
 
     async def create_session(
         self, title: str, file: UploadFile
@@ -77,7 +95,7 @@ class SessionService:
 
         try:
             async with aiofiles.open(destination_path, "wb") as out_file:
-                while chunk := await file.read(1024 * 1024):  # 1MB Chunks
+                while chunk := await file.read(1024 * 1024):
                     await out_file.write(chunk)
         except Exception as err:
             LocalStorageService.cleanup_file(str(destination_path))
@@ -101,3 +119,92 @@ class SessionService:
         except Exception:
             LocalStorageService.cleanup_file(str(destination_path))
             raise
+
+    async def update_title(self, session_id: str, new_title: str) -> SessionModel:
+        """
+        Purpose: Updates title of an active session with mutation shield check.
+        Flow:
+              1. Validate session exists and is not archived.
+              2. Update title via repository.
+        Inputs: session_id (str), new_title (str).
+        Outputs: Updated SessionModel instance.
+        """
+        await self._get_active_session_or_raise(session_id)
+        updated_session = await self.repository.update_title(session_id, new_title)
+        if not updated_session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Session with ID '{session_id}' was not found.",
+            )
+        return updated_session
+
+    async def assign_category(
+        self, session_id: str, category_id: Optional[str]
+    ) -> SessionModel:
+        """
+        Purpose: Assigns or clears category foreign key link on an active session.
+        Flow:
+              1. Validate session exists and is not archived.
+              2. If category_id is provided, verify category exists in database.
+              3. Update category foreign key via repository.
+        Inputs: session_id (str), category_id (Optional[str]).
+        Outputs: Updated SessionModel instance.
+        """
+        await self._get_active_session_or_raise(session_id)
+
+        if category_id is not None:
+            category = await self.category_repository.get_by_id(category_id)
+            if not category:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Category with ID '{category_id}' was not found.",
+                )
+
+        updated_session = await self.repository.update_category(session_id, category_id)
+        if not updated_session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Session with ID '{session_id}' was not found.",
+            )
+        return updated_session
+
+    async def archive_session(self, session_id: str) -> SessionModel:
+        """
+        Purpose: Archives a session, removing it from active queries and locking mutation edits.
+        Flow:
+              1. Query session by ID.
+              2. Set is_archived = True in database.
+        Inputs: session_id (str).
+        Outputs: Updated SessionModel instance.
+        """
+        session = await self.repository.get_by_id(session_id)
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Session with ID '{session_id}' was not found.",
+            )
+        updated_session = await self.repository.set_archived(session_id, True)
+        return updated_session  # type: ignore
+
+    async def delete_session(self, session_id: str) -> None:
+        """
+        Purpose: Executes hard delete of session database record and purges physical local audio file.
+        Flow:
+              1. Fetch session record from database.
+              2. Remove associated local audio file from disk via LocalStorageService.
+              3. Hard delete SQLite database row.
+        Inputs: session_id (str).
+        Outputs: None.
+        """
+        session = await self.repository.get_by_id(session_id)
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Session with ID '{session_id}' was not found.",
+            )
+
+        # 1. Purge physical audio file from local disk
+        LocalStorageService.cleanup_file(session.file_path)
+
+        # 2. Purge record from SQLite
+        await self.repository.delete(session_id)

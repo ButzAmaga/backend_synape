@@ -1,24 +1,29 @@
 """
 Purpose: Defines SQLAlchemy ORM domain model for meeting sessions table in SQLite.
 Flow:
-1. Declare SessionStatus enumeration for pipeline states.
-2. Model SessionModel database fields including file paths, MIME types, and timestamps.
-3. Establish database table structure for session persistence.
+      1. Declare SessionStatus enumeration for pipeline states.
+      2. Model SessionModel database fields including foreign key to CategoryModel and error_message.
+      3. Establish database table structure for session persistence.
 Inputs: DeclarativeBase from app.core.database.
 Outputs: SessionModel SQLAlchemy entity.
 """
 
 import enum
 from datetime import datetime
-from sqlalchemy import String, Integer, Boolean, DateTime, Enum
-from sqlalchemy.orm import Mapped, mapped_column
+from typing import Optional, TYPE_CHECKING
+from sqlalchemy import String, Integer, Boolean, DateTime, Enum, ForeignKey, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
+
+if TYPE_CHECKING:
+    from app.models.category import CategoryModel
+
 
 class SessionStatus(str, enum.Enum):
     """
     Purpose: Enumerates all valid processing states for a meeting session.
     Flow:
-    1. Define explicit string constant values for pipeline stages.
+          1. Define explicit string constant values for pipeline stages.
     Inputs: None.
     Outputs: SessionStatus enum values.
     """
@@ -34,9 +39,9 @@ class SessionModel(Base):
     """
     Purpose: Map session database record to SQLite "sessions" table schema.
     Flow:
-    1. Set table name to "sessions".
-    2. Map primary key UUID string.
-    3. Map file metadata, status flags, and indexed creation timestamps.
+          1. Set table name to "sessions".
+          2. Map primary key UUID string.
+          3. Map file metadata, category foreign key, status, error details, archive flags, and timestamps.
     Inputs: Base ORM declarative class.
     Outputs: Mapped ORM model for session operations.
     """
@@ -55,8 +60,15 @@ class SessionModel(Base):
         nullable=False,
         index=True,
     )
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     is_archived: Mapped[bool] = mapped_column(
         Boolean, default=False, index=True, nullable=False
+    )
+    category_id: Mapped[Optional[str]] = mapped_column(
+        String(36),
+        ForeignKey("categories.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, index=True, nullable=False
@@ -66,4 +78,8 @@ class SessionModel(Base):
         default=datetime.utcnow,
         onupdate=datetime.utcnow,
         nullable=False,
+    )
+
+    category: Mapped[Optional["CategoryModel"]] = relationship(
+        "CategoryModel", back_populates="sessions"
     )

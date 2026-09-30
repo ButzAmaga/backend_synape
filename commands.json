@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "groups": [
+    {
+      "id": "7151e753ccb8",
+      "name": "Default",
+      "commands": []
+    },
+    {
+      "id": "594936ee78c8",
+      "name": "synapse backend",
+      "commands": [
+        {
+          "id": "11f0be37d59a",
+          "text": "pytest",
+          "created": 1790517792.2836175
+        },
+        {
+          "id": "7969dfda8c4f",
+          "text": "activate.bin",
+          "created": 1790518423.3345957
+        }
+      ]
+    }
+  ],
+  "templates": [
+    {
+      "id": "743c5f49ee4d",
+      "name": "Echo: Hello World",
+      "pattern": "echo Hello World",
+      "description": "Print a greeting."
+    },
+    {
+      "id": "d6205e9b3686",
+      "name": "Echo: Message",
+      "pattern": "echo {{message}}",
+      "description": "Print a custom message."
+    },
+    {
+      "id": "d1f92fe45a85",
+      "name": "Echo: Variable",
+      "pattern": "echo %{{variable}}%",
+      "description": "Echo an environment variable (Windows-style)."
+    },
+    {
+      "id": "ba695524f00f",
+      "name": "npm: test",
+      "pattern": "npm test",
+      "description": "Run the npm test script."
+    },
+    {
+      "id": "b9ea201e445c",
+      "name": "npm: run script",
+      "pattern": "npm run {{script}}",
+      "description": "Run a named npm script."
+    },
+    {
+      "id": "a08429375a7d",
+      "name": "python: run file",
+      "pattern": "python {{file}}",
+      "description": "Run a Python file."
+    },
+    {
+      "id": "0cd98073bfaa",
+      "name": "pytest",
+      "pattern": "pytest {{path}}",
+      "description": "Run pytest against a path."
+    },
+    {
+      "id": "783503b5f187",
+      "name": "git: status",
+      "pattern": "git status",
+      "description": "Show working tree status."
+    }
+  ]
+}

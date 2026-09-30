@@ -20,7 +20,7 @@ class HealthCheckResponse(BaseModel):
     Outputs: Serialized health response model.
     """
 
-    status: str = Field(..., example="HEALTHY")
-    database_connected: bool = Field(..., example=True)
-    disk_free_bytes: int = Field(..., example=107374182400)
-    disk_total_bytes: int = Field(..., example=512075251712)
+    status: str = Field(..., json_schema_extra={"example": "HEALTHY"})
+    database_connected: bool = Field(..., json_schema_extra={"example": True})
+    disk_free_bytes: int = Field(..., json_schema_extra={"example": 107374182400})
+    disk_total_bytes: int = Field(..., json_schema_extra={"example": 512075251712})

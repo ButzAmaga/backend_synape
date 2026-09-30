@@ -35,12 +35,12 @@
 ## Phase 3: Session Listing & Cursor Pagination
 
 ### Prerequisites (JIT Setup for Phase 3)
-- [] **TASK-05: JIT Cursor Pagination Query Helpers**
+- [x] **TASK-05: JIT Cursor Pagination Query Helpers**
   - **Includes:** `CursorPaginatedSessionResponse` schema and repository query builder for date-descending cursor pagination filtering non-archived entries.
   - **Verification:** Unit test repository query against SQLite with mock session entries.
 
 ### Feature Delivery & Live Verification
-- [ ] **TASK-06: Paginated Session Listing Endpoint**
+- [x] **TASK-06: Paginated Session Listing Endpoint**
   - **Endpoint:** `GET /api/v1/sessions?limit=10&cursor=...`
   - **Prerequisites:** TASK-04, TASK-05
   - **Includes:** Cursor-based pagination controller enforcing limit parameters.
@@ -51,28 +51,28 @@
 ## Phase 4: Session Mutations (Update, Category, Archive, Delete)
 
 ### Prerequisites (JIT Setup for Phase 4)
-- [ ] **TASK-07: JIT Category Schema & Mutation Request DTOs**
+- [x] **TASK-07: JIT Category Schema & Mutation Request DTOs**
   - **Includes:** SQLAlchemy `CategoryModel` table definition, migration script, Pydantic `SessionUpdateRequest`, and category assignment schemas.
   - **Verification:** Run database migration adding `categories` table and foreign key constraint.
 
 ### Feature Delivery & Live Verification
-- [ ] **TASK-08: Session Title Update Endpoint**
+- [x] **TASK-08: Session Title Update Endpoint**
   - **Endpoint:** `PATCH /api/v1/sessions/{id}`
   - **Prerequisites:** TASK-04, TASK-07
   - **Verification:** Send `PATCH` payload with `{"title": "Project Sync"}`; confirm updated title in database.
 
-- [ ] **TASK-09: Category Assignment Endpoint**
+- [x] **TASK-09: Category Assignment Endpoint**
   - **Endpoint:** `PATCH /api/v1/sessions/{id}/category`
   - **Prerequisites:** TASK-07, TASK-08
   - **Verification:** Assign a valid category ID to session; verify foreign key link in SQLite.
 
-- [ ] **TASK-10: Session Archive & Mutation Shield Endpoint**
+- [x] **TASK-10: Session Archive & Mutation Shield Endpoint**
   - **Endpoint:** `POST /api/v1/sessions/{id}/archive`
   - **Prerequisites:** TASK-08
   - **Includes:** Archive state toggle and guard logic blocking edits on archived records with HTTP 400.
   - **Verification:** Call archive endpoint on session; attempt a title update via `PATCH` and confirm API rejects mutation with `HTTP 400 Bad Request`.
 
-- [ ] **TASK-11: Hard Delete Session Endpoint**
+- [x] **TASK-11: Hard Delete Session Endpoint**
   - **Endpoint:** `DELETE /api/v1/sessions/{id}`
   - **Prerequisites:** TASK-04
   - **Includes:** Database record purge and physical disk file cleanup (`os.remove`).

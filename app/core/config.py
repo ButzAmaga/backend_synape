@@ -9,9 +9,7 @@ Outputs: Exposes global settings singleton instance.
 """
 
 import pathlib
-
-from pydantic_settings import BaseSettings
-
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     """
@@ -32,6 +30,8 @@ class Settings(BaseSettings):
     BASE_DATA_DIR: pathlib.Path = pathlib.Path.cwd() / ".data"
     AUDIO_STORAGE_DIR: pathlib.Path = BASE_DATA_DIR / "audio"
 
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    
     # SQLite Database
     DATABASE_URL: str = f"sqlite+aiosqlite:///{BASE_DATA_DIR}/app_data.db"
 
@@ -46,8 +46,6 @@ class Settings(BaseSettings):
         """
         self.AUDIO_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
 
-    class Config:
-        env_file = ".env"
 
 
 settings = Settings()

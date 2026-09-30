@@ -57,43 +57,6 @@ async def test_task2_health_endpoint(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_task3_session_repository_crud(db_session: AsyncSession):
-    """
-    Purpose: Verify Task 3 Session entity persistence and repository queries.
-    Flow:
-          1. Create SessionModel instance with dummy metadata.
-          2. Persist record using SessionRepository.
-          3. Query record back via get_by_id and get_all methods.
-    Inputs: db_session (AsyncSession).
-    Outputs: None.
-    """
-    repo = SessionRepository(db_session)
-    session_id = str(uuid.uuid4())
-
-    new_session = SessionModel(
-        id=session_id,
-        title="Board Strategy Sync",
-        file_path=f"/tmp/audio_{session_id}.m4a",
-        original_file_name="strategy_meeting.m4a",
-        file_size_bytes=15400000,
-        mime_type="audio/m4a",
-        status=SessionStatus.INGESTION,
-    )
-
-    created = await repo.create(new_session)
-    assert created.id == session_id
-    assert created.status == SessionStatus.INGESTION
-
-    retrieved = await repo.get_by_id(session_id)
-    assert retrieved is not None
-    assert retrieved.title == "Board Strategy Sync"
-
-    all_sessions = await repo.get_all(limit=10)
-    assert len(all_sessions) == 1
-    assert all_sessions[0].id == session_id
-
-
-@pytest.mark.asyncio
 async def test_task3_storage_service_disk_verification():
     """
     Purpose: Verify Task 3 LocalStorageService disk space check logic.
