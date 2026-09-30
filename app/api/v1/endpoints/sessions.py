@@ -52,7 +52,7 @@ ALLOWED_MIME_TYPES = {
 
 
 @router.get(
-    "/",
+    "",
     response_model=CursorPaginatedSessionResponse,
     status_code=status.HTTP_200_OK,
     summary="List active sessions with cursor pagination",
@@ -78,7 +78,7 @@ async def list_sessions(
 
 
 @router.post(
-    "/",
+    "",
     response_model=SessionResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Upload audio recording and trigger session ingestion",

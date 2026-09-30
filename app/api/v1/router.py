@@ -14,4 +14,4 @@ from app.api.v1.endpoints import sessions
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health.router, tags=["Health"])
-api_router.include_router(sessions.router, tags=["Sessions"])
+api_router.include_router(sessions.router, prefix="/sessions", tags=["Sessions"])

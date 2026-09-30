@@ -20,6 +20,9 @@ async def test_startup_crash_recovery_resets_stale_sessions(db_session: AsyncSes
         id="stale-test-session-id",
         title="Stale Session",
         file_path="/tmp/stale.mp3",
+        original_file_name="stale.mp3",  
+        file_size_bytes=1024,             
+        mime_type="audio/mp3",            
         status=PipelineStatus.CONVERSION.value,
     )
     db_session.add(stale_session)
@@ -43,6 +46,9 @@ async def test_retry_failed_session_endpoint(client: AsyncClient, db_session: As
         title="Failed Session Test",
         file_path="/tmp/failed.mp3",
         status=PipelineStatus.FAILED.value,
+        original_file_name="failed.mp3",  
+        file_size_bytes=1024,             
+        mime_type="audio/mp3",            
         error_message="Previous error",
     )
     db_session.add(failed_session)

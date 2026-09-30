@@ -84,3 +84,15 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
         yield ac
 
     app.dependency_overrides.clear()
+
+@pytest.fixture(autouse=True)
+def use_test_session_factory(monkeypatch):
+    """
+    Purpose: Sets up test session factory for pipeline services.
+    Flow:
+          1. Override async session factory for pipeline services.
+    Inputs: monkeypatch (pytest.MonkeyPatch).
+    Outputs: None.
+    """
+    monkeypatch.setattr("app.core.pipeline.async_session_factory", TestingSessionLocal)
+    monkeypatch.setattr("app.services.pipeline_service.async_session_factory", TestingSessionLocal)
